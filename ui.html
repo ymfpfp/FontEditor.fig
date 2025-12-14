@@ -1,0 +1,14 @@
+<input id="upload" type="file"/>
+<script>
+  const upload = document.getElementById("upload");
+  upload.addEventListener("change", event => {
+    if (upload.files.length < 1) return;
+    const buf = upload.files[0].arrayBuffer();
+    parent.postMessage({
+      pluginMessage: {
+        type: "upload", 
+        buf: new Uint8Array(buf)
+      }
+    }, "*");
+  });
+</script>
