@@ -1,4 +1,4 @@
-import t from "font-engine";
+import fontEngine from "font-engine";
 
 figma.showUI(
   __html__,
@@ -12,9 +12,14 @@ type Message = UploadMessage;
 figma.ui.onmessage = (msg: Message) => {
   switch (msg.type) {
     case "upload":
-      console.log("buf", msg.buf);
-      console.log(t);
+      upload(msg);
+      break;
   }
 
   figma.closePlugin();
+};
+
+const upload = (msg: UploadMessage) => {
+  const font = fontEngine.font(msg.buf);
+  console.log(font.glyph("á".charCodeAt(0)));
 };

@@ -5,7 +5,6 @@ import {CharacterToGlyphIndex, CmapFormat4} from "./cmap";
 import Cursor, * as parse from "./cursor";
 import expect from "./expect";
 import {GlyphMetadata} from "./glyph";
-import TrueType from "./ttf";
 
 export enum SupportedFormat {
   TrueType,
@@ -33,7 +32,7 @@ export const parseScalarType = (scalar: number): SupportedFormat => {
     case 0x4f54544f:
       return SupportedFormat.OpenType;
     default:
-      throw new errors.UnsupportedFormat();
+      throw new errors.UnsupportedFormat("Font format not supported");
   }
 };
 
@@ -107,11 +106,6 @@ export default class OpenType {
     return this.metadata.type === SupportedFormat.TrueType;
   }
 
-  get ttf(): TrueType | undefined {
-    // Return as `TrueType` if glyf table exists.
-    if (this.isTTF) return new TrueType(this.cursor.buf);
-  }
-
   table(tag: string) {
     const table = this.tables[tag];
     expect(table, errors.TableNotFound);
@@ -123,11 +117,9 @@ export default class OpenType {
 
   parseHead() {
     const {cursor} = this.table("head");
-    // Skip version.
-    cursor.skip(1);
 
-    // Skip font revision and checksum.
-    cursor.skip(parse.DOUBLE_WORD * 2);
+    // Skip version, font revision, checksum adjustment.
+    cursor.skip(parse.DOUBLE_WORD * 3);
 
     const magicNumber = cursor.nextUint32();
     if (magicNumber !== 0x5f0f3cf5) throw new errors.UnsupportedFormat();
@@ -162,7 +154,7 @@ export default class OpenType {
   parseMaxp() {
     const {cursor} = this.table("maxp");
     // Skip version.
-    cursor.skip(1);
+    cursor.skip(parse.DOUBLE_WORD);
 
     const numGlyphs = cursor.nextUint16();
 
@@ -188,7 +180,8 @@ export default class OpenType {
       // Ignoring legacy (1), 3 reliably maps down to Unicode if implemented.
     }
 
-    if (platformId !== 0) throw new errors.UnsupportedFormat();
+    if (platformId !== 0) 
+      throw new errors.UnsupportedFormat("TODO: Mac and MS encoding platforms");
 
     // platformSpecificId, or Unicode version.
     cursor.skip(parse.WORD);
@@ -217,9 +210,9 @@ export default class OpenType {
 
     // Grab the bearings, skipping them if there is no table for that dimension
     // (i.e., no horizontal bearing for vertical CJK fonts).
-    if ("htmx" in this.tables) {
+    if ("hmtx" in this.tables) {
       const {cursor} = this.table("hmtx");
-      cursor.skip(parse.WORD * idx);
+      cursor.skip(parse.DOUBLE_WORD * idx);
       const advanceWidth = cursor.nextUint16();
       bearings.lsb = cursor.nextInt16();
       bearings.rsb = advanceWidth - bearings.lsb;
@@ -227,7 +220,7 @@ export default class OpenType {
 
     if ("vmtx" in this.tables) {
       const {cursor} = this.table("vmtx");
-      cursor.skip(parse.WORD * idx);
+      cursor.skip(parse.DOUBLE_WORD * idx);
       const advanceHeight = cursor.nextUint16();
       bearings.tsb = cursor.nextInt16();
       bearings.bsb = advanceHeight - bearings.tsb;
@@ -239,12 +232,17 @@ export default class OpenType {
   // More user facing I suppose.
 
   glyphFromIndex(idx: number) {
+    throw new errors.UnsupportedFormat("TODO: glyphFromIndex for OTF");
   }
 
   glyph(codepoint: number) {
+    throw new errors.UnsupportedFormat("TODO: glyph for OTF");
   }
 
   *glyphs() {
     // Stream of all the glyphs in this file.
+    for (const idx of this.mapping.glyphIndexes()) {
+      yield this.glyphFromIndex(idx);
+    }
   }
 }

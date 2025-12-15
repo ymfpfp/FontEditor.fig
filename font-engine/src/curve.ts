@@ -33,7 +33,9 @@ export default class Curve {
       start: [number, number], 
       end: [number, number]
     ) => 
-      start.map(axis => axis + (2 / 3) * (end[axis] - axis)) as [number, number];
+      start.map(
+        (value, axis) => value + (2 / 3) * (end[axis] - value)
+      ) as [number, number];
     return new Curve(
       [
         curve[0],

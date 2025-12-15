@@ -19,9 +19,9 @@ const littleEndian = () => {
 const engineEndian = littleEndian() ? Endian.little : Endian.big;
 
 // Sign bit and u64 full.
-const one = BigInt(1);
-const max = one << BigInt(63);
-const full = one << BigInt(64);
+// const one = BigInt(1);
+// const max = one << BigInt(63);
+// const full = one << BigInt(64);
 
 export default class Cursor {
   offset: number;
@@ -35,7 +35,7 @@ export default class Cursor {
   constructor(into: Uint8Array, endian: Endian, jump: number=0) {
     this.buf = into;
     this.offset = jump;
-    if (this.atEnd) throw new Cursor.OverflowError();
+    if (this.atEnd) throw new Cursor.OverflowError("Jump cannot be > length of buffer");
     this.endian = endian;
   }
 
@@ -71,7 +71,7 @@ export default class Cursor {
   }
 
   seekEnd(idx: number) {
-    this.offset = this.length - idx - 1;
+    this.offset = this.length - idx;
     if (this.atEnd) throw new Cursor.OverflowError();
   }
   
@@ -99,20 +99,20 @@ export default class Cursor {
       this.nextUint16()
     ];
     // JS stores numbers as 32 bits by default. As a result we >>> 0 to force 
-  // an unsigned interpretation.
+    // an unsigned interpretation.
     if (this.endian === Endian.little) return ((u32[1] << 16) | u32[0]) >>> 0;
     return ((u32[0] << 16) | u32[1]) >>> 0;
   }
 
-  nextUint64() {
-    // No native 64-bit integer is goofy, so we have to use BigInt.
-    const u64 = [
-      BigInt(this.nextUint32()),
-      BigInt(this.nextUint32())
-    ];
-    if (this.endian === Endian.little) return (u64[1] << BigInt(32)) | u64[0];
-    return (u64[0] << BigInt(32)) | u64[1];
-  }
+  // nextUint64() {
+  //   // No native 64-bit integer is goofy, so we have to use BigInt.
+  //   const u64 = [
+  //     BigInt(this.nextUint32()),
+  //     BigInt(this.nextUint32())
+  //   ];
+  //   if (this.endian === Endian.little) return (u64[1] << BigInt(32)) | u64[0];
+  //   return (u64[0] << BigInt(32)) | u64[1];
+  // }
 
   // And we'll throw in some bitwise tricks to get signed values too.
   nextInt16() {
@@ -126,11 +126,11 @@ export default class Cursor {
     return this.nextUint32() | 0;
   }
 
-  nextInt64() {
-    const u64 = this.nextUint64();
-    // We apply the same sign trick as we did for `nextInt16()`.
-    return u64 >= max ? u64 - full : u64;
-  }
+  // nextInt64() {
+  //   const u64 = this.nextUint64();
+  //   // We apply the same sign trick as we did for `nextInt16()`.
+  //   return u64 >= max ? u64 - full : u64;
+  // }
 
   // And more tricks for floats. We use ArrayBuffer because it looks clean.
   nextFloat() {

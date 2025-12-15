@@ -18,7 +18,7 @@ export default class TrueType extends OpenType {
     //   u16 * 2 (second to last).
     // * loca for glyph index to actual glyph data (glyf) mappings.
     const {cursor: head} = this.table("head");
-    head.seekEnd(parse.DOUBLE_WORD * 2);
+    head.seekEnd(parse.WORD * 2);
     this.extendedMetadata = {
       locaIsLong: head.nextUint16() === 1 ? true : false
     };
@@ -62,8 +62,8 @@ export default class TrueType extends OpenType {
       bearings: this.bearings(idx)
     };
 
-    if (contours < 0) return new Glyph(parseCompoundOutline(cursor), metadata);
-    return new Glyph(parseSimpleOutline(cursor), metadata);
+    if (contours < 0) return new Glyph(parseCompoundOutline(this, cursor), metadata);
+    return new Glyph(parseSimpleOutline(cursor, contours), metadata);
   }
 
   glyph(codepoint: number) {
@@ -199,7 +199,7 @@ export const parseSimpleOutline = (
 
   // A contour represents a closed loop made by Bezier curves. Right now there are 
   // really just individual points in a contour that we need to organize into curves.
-  const xContours  = parsePoints(0);
+  const xContours = parsePoints(0);
   const yContours = parsePoints(1);
 
   const outline: Glyph["outline"] = [];
@@ -209,29 +209,29 @@ export const parseSimpleOutline = (
     offset: number,
     xPoints: number[],
     yPoints: number[],
-  ): Curve[] => {
+  ): [number, Curve[]] => {
     // The way we parse the curves ensures this is always on-point.
     const p0 = [xPoints[offset], yPoints[offset]] as [number, number];
 
-    const p1 = [xPoints[offset], yPoints[offset]] as [number, number];
+    const p1 = [xPoints[++offset], yPoints[offset]] as [number, number];
     const {isControlPoint: p1IsControlPoint} = flags[start + offset];
   
     if (!p1IsControlPoint) 
       // Straight line, on-on.
-      return [Curve.fromQuadraticBezier(
+      return [offset, [Curve.fromQuadraticBezier(
         [
           p0, 
           p1, 
           [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2]
         ]
-      )];
+      )]];
 
     const p2 = [xPoints[++offset], yPoints[offset]] as [number, number];
     const {isControlPoint: p2IsControlPoint} = flags[start + offset];
 
     if (!p2IsControlPoint) 
       // Explicit curve, on-off-on.
-      return [Curve.fromQuadraticBezier([p0, p2, p1])];
+      return [offset, [Curve.fromQuadraticBezier([p0, p2, p1])]];
 
     // On-off-off...-on.
     const controlPoints = [p1, p2];
@@ -246,6 +246,10 @@ export const parseSimpleOutline = (
     const curves: Curve[] = [];
     let prevOnPoint = p0;
     for (let k = 1; k < controlPoints.length; k++) {
+      // These are out off-points, meaning there is an implicit on-curve point linking
+      // back to `prevOnPoint`. e.g. we start with two on-curve points, `p0` in the
+      // outer scope and the midpoint between the current control point and the previous
+      // one.
       const p1 = controlPoints[k];
       const p0 = controlPoints[k - 1];
       const midpoint = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2] as [number, number];
@@ -258,7 +262,7 @@ export const parseSimpleOutline = (
       [prevOnPoint, p0, controlPoints[controlPoints.length - 1]]
     ));
 
-    return curves;
+    return [offset, curves];
   };
 
   // Let's do some processing on the points now, and zip the two axes together.
@@ -266,19 +270,21 @@ export const parseSimpleOutline = (
   // especially for the on-off-off...-on pattern (multiple off points in a row,
   // representing implicit quadratic Beziers.)
   for (const [i, xPoints] of xContours.entries()) {
+    const contour: Contour = [];
     const yPoints = yContours[i];
 
     // Connect the first and last points.
+    const numPoints = xPoints.length;
     xPoints.push(xPoints[0]);
     yPoints.push(yPoints[0]);
 
-    const contour: Contour = [];
-
     // Start index, so we can offset from it.
     const start = (contourEndpoints[i - 1] ?? -1) + 1;
-    const numPoints = xPoints.length;
-    for (let j = 0; j < numPoints;) 
-      contour.push(...nextCurveSet(start, j, xPoints, yPoints));
+    for (let j = 0; j < numPoints;) {
+      const [offset, curveSet] = nextCurveSet(start, j, xPoints, yPoints);
+      contour.push(...curveSet);
+      j = offset;
+    }
     outline.push(contour);
   }
 
