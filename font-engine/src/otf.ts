@@ -4,7 +4,7 @@
 import {CharacterToGlyphIndex, CmapFormat4} from "./cmap";
 import Cursor, * as parse from "./cursor";
 import expect from "./expect";
-import {GlyphMetadata} from "./glyph";
+import Glyph, {GlyphMetadata} from "./glyph";
 
 export enum SupportedFormat {
   TrueType,
@@ -231,11 +231,11 @@ export default class OpenType {
 
   // More user facing I suppose.
 
-  glyphFromIndex(idx: number) {
+  glyphFromIndex(idx: number): Glyph {
     throw new errors.UnsupportedFormat("TODO: glyphFromIndex for OTF");
   }
 
-  glyph(codepoint: number) {
+  glyph(codepoint: number): Glyph {
     throw new errors.UnsupportedFormat("TODO: glyph for OTF");
   }
 
