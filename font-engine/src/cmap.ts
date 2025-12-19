@@ -1,6 +1,6 @@
 import Cursor, * as parse from "./cursor";
-import {errors} from "./otf";
-import {NOTDEF} from "./index";
+import { errors } from "./otf";
+import { NOTDEF } from "./index";
 
 export interface CharacterToGlyphIndex {
   // We implement this as an interface because each cmap format has different encoding
@@ -9,9 +9,12 @@ export interface CharacterToGlyphIndex {
   glyphIndexes: () => Generator<number, void, unknown>;
 
   // TODO: addGlyph(codepoint: number) for in place representation.
+  // This would be perfect but in place representation requires altering the entire
+  // file representation. In theory though, I think it would be possible to rewrite
+  // to meet this.
 }
 
-type CodepointRange = [number, number];
+export type CodepointRange = [number, number];
 
 export class CmapFormat4 implements CharacterToGlyphIndex {
   codepointRanges: CodepointRange[];
@@ -21,10 +24,8 @@ export class CmapFormat4 implements CharacterToGlyphIndex {
   idRangeOffset: number[];
   idRangeOffsetCursor: Cursor;
 
-  constructor(
-    cursor: Cursor
-  ) {
-    // 4 handles files only with codepoints that fall within the 
+  constructor(cursor: Cursor) {
+    // 4 handles files only with codepoints that fall within the
     // Basic Multilingual Plane (BMP). It's the only one we'll be handling.
     //
     // It makes use of segments, or ranges of codepoints.
@@ -59,13 +60,14 @@ export class CmapFormat4 implements CharacterToGlyphIndex {
     // Now idDelta[segments], which is delta for all codepoints in segment.
     // This is used if idRangeOffset isn't used, to offset directly.
     this.idDelta = [];
-    for (let i = 0; i < this.segments; i++) this.idDelta.push(cursor.nextUint16());
+    for (let i = 0; i < this.segments; i++)
+      this.idDelta.push(cursor.nextUint16());
 
     // Now idRangeOffset[segments], which is used to offset into glyphIndexArray,
     // which gives us the index directly.
     this.idRangeOffset = [];
     const idRangeOffsetStart = cursor.offset;
-    for (let i = 0; i < this.segments; i++) 
+    for (let i = 0; i < this.segments; i++)
       this.idRangeOffset.push(cursor.nextUint16());
 
     const remaining = (length - (cursor.offset - start)) * parse.WORD;
@@ -100,7 +102,8 @@ export class CmapFormat4 implements CharacterToGlyphIndex {
 
     // Otherwise, we need to offset into glyphIndexArray to get the actual index.
     // To do this we need to start from the byte offset of the rangeOffset value.
-    const localIndex = rangeOffset + 2 * (codepoint - segment[0]) + parse.WORD * idx;
+    const localIndex =
+      rangeOffset + 2 * (codepoint - segment[0]) + parse.WORD * idx;
     this.idRangeOffsetCursor.reset();
     this.idRangeOffsetCursor.seek(localIndex);
     const glyphIndex = this.idRangeOffsetCursor.nextUint16();

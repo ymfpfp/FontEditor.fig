@@ -1,8 +1,8 @@
-import OpenType, {errors} from "./otf";
+import OpenType, { errors } from "./otf";
 import Cursor, * as parse from "./cursor";
-import Glyph, {Contour, GlyphMetadata} from "./glyph";
+import Glyph, { Contour, GlyphMetadata } from "./glyph";
 import expect from "./expect";
-import Curve, {QuadraticBezier} from "./curve";
+import Curve, { QuadraticBezier } from "./curve";
 
 export default class TrueType extends OpenType {
   extendedMetadata: {
@@ -17,7 +17,7 @@ export default class TrueType extends OpenType {
     // * head for a TTF-specific value, whether glyph indexes in loca are u32 or
     //   u16 * 2 (second to last).
     // * loca for glyph index to actual glyph data (glyf) mappings.
-    const {cursor: head} = this.table("head");
+    const { cursor: head } = this.table("head");
     head.seekEnd(parse.WORD * 2);
     this.extendedMetadata = {
       locaIsLong: head.nextUint16() === 1 ? true : false
@@ -34,9 +34,9 @@ export default class TrueType extends OpenType {
   }
 
   parseLoca() {
-    const {cursor} = this.table("loca");
+    const { cursor } = this.table("loca");
     const indices = [];
-    for (let i = 0; i < this.metadata.numGlyphs + 1; i++) 
+    for (let i = 0; i < this.metadata.numGlyphs + 1; i++)
       indices.push(
         this.metadata.locaIsLong ? cursor.nextUint32() : cursor.nextUint16() * 2
       );
@@ -52,7 +52,7 @@ export default class TrueType extends OpenType {
 
     const contours = cursor.nextInt16();
 
-    const metadata: GlyphMetadata = {  
+    const metadata: GlyphMetadata = {
       bbox: {
         xMin: cursor.nextInt16(),
         yMin: cursor.nextInt16(),
@@ -62,7 +62,8 @@ export default class TrueType extends OpenType {
       bearings: this.bearings(idx)
     };
 
-    if (contours < 0) return new Glyph(parseCompoundOutline(this, cursor), metadata);
+    if (contours < 0)
+      return new Glyph(parseCompoundOutline(this, cursor), metadata);
     return new Glyph(parseSimpleOutline(cursor, contours), metadata);
   }
 
@@ -72,14 +73,14 @@ export default class TrueType extends OpenType {
   }
 }
 
-// Given a cursor, parse and return an outline. Curves in TTF are represented as 
-// quadratic bezier curves (we convert them to cubic beziers, you can access as 
+// Given a cursor, parse and return an outline. Curves in TTF are represented as
+// quadratic bezier curves (we convert them to cubic beziers, you can access as
 // quadratic bezier afterwards - see `curve.ts`), and are encoded as so:
 
-// Simple glyphs have a set of contour endpoints, followed by a set of flags, 
+// Simple glyphs have a set of contour endpoints, followed by a set of flags,
 // followed by xy points that we can group into curves and then into contours.
 export const parseSimpleOutline = (
-  cursor: Cursor, 
+  cursor: Cursor,
   totalContours: number
 ): Glyph["outline"] => {
   interface Flag {
@@ -158,7 +159,7 @@ export const parseSimpleOutline = (
   // The first point is relative to (0, 0), and all points are relative to the point
   // before. The last point and first point implicitly join.
   //
-  // We need to parse x and y separately since once comes after the other, then we 
+  // We need to parse x and y separately since once comes after the other, then we
   // can zip them.
   const nextPoint = (idx: number, axis: number, delta: number) => {
     const flag = flags[idx];
@@ -166,13 +167,13 @@ export const parseSimpleOutline = (
       // Size is 1, therefore use sign.
       const coord =
         expect(cursor.nextUint8(), errors.InvalidParsed) * flag.sign[axis];
-      return {...flag, coord: delta + coord};
+      return { ...flag, coord: delta + coord };
     }
 
     // Size is 2, either the previous delta is repeated as normal or we offset.
-    if (flag.repeat[axis]) return {...flag, coord: delta};
+    if (flag.repeat[axis]) return { ...flag, coord: delta };
     const coord = cursor.nextInt16();
-    return {...flag, coord: delta + coord};
+    return { ...flag, coord: delta + coord };
   };
 
   const parsePoints = (axis: number) => {
@@ -192,12 +193,12 @@ export const parseSimpleOutline = (
       start = endpoint + 1;
     }
 
-    // At this point, these aren't quite fully-formed quadratic Beziers yet, just 
+    // At this point, these aren't quite fully-formed quadratic Beziers yet, just
     // a number[][]. Lists of points, in other words.
     return outline;
   };
 
-  // A contour represents a closed loop made by Bezier curves. Right now there are 
+  // A contour represents a closed loop made by Bezier curves. Right now there are
   // really just individual points in a contour that we need to organize into curves.
   const xContours = parsePoints(0);
   const yContours = parsePoints(1);
@@ -205,31 +206,34 @@ export const parseSimpleOutline = (
   const outline: Glyph["outline"] = [];
 
   const nextCurveSet = (
-    start: number, 
+    start: number,
     offset: number,
     xPoints: number[],
-    yPoints: number[],
+    yPoints: number[]
   ): [number, Curve[]] => {
     // The way we parse the curves ensures this is always on-point.
     const p0 = [xPoints[offset], yPoints[offset]] as [number, number];
 
     const p1 = [xPoints[++offset], yPoints[offset]] as [number, number];
-    const {isControlPoint: p1IsControlPoint} = flags[start + offset];
-  
-    if (!p1IsControlPoint) 
+    const { isControlPoint: p1IsControlPoint } = flags[start + offset];
+
+    if (!p1IsControlPoint)
       // Straight line, on-on.
-      return [offset, [Curve.fromQuadraticBezier(
+      return [
+        offset,
         [
-          p0, 
-          p1, 
-          [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2]
+          Curve.fromQuadraticBezier([
+            p0,
+            p1,
+            [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2]
+          ])
         ]
-      )]];
+      ];
 
     const p2 = [xPoints[++offset], yPoints[offset]] as [number, number];
-    const {isControlPoint: p2IsControlPoint} = flags[start + offset];
+    const { isControlPoint: p2IsControlPoint } = flags[start + offset];
 
-    if (!p2IsControlPoint) 
+    if (!p2IsControlPoint)
       // Explicit curve, on-off-on.
       return [offset, [Curve.fromQuadraticBezier([p0, p2, p1])]];
 
@@ -252,15 +256,22 @@ export const parseSimpleOutline = (
       // one.
       const p1 = controlPoints[k];
       const p0 = controlPoints[k - 1];
-      const midpoint = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2] as [number, number];
+      const midpoint = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2] as [
+        number,
+        number
+      ];
       curves.push(Curve.fromQuadraticBezier([prevOnPoint, midpoint, p0]));
       prevOnPoint = midpoint;
     }
 
     // Last but not least, join the last off-point to our first point.
-    curves.push(Curve.fromQuadraticBezier(
-      [prevOnPoint, p0, controlPoints[controlPoints.length - 1]]
-    ));
+    curves.push(
+      Curve.fromQuadraticBezier([
+        prevOnPoint,
+        p0,
+        controlPoints[controlPoints.length - 1]
+      ])
+    );
 
     return [offset, curves];
   };
@@ -280,7 +291,7 @@ export const parseSimpleOutline = (
 
     // Start index, so we can offset from it.
     const start = (contourEndpoints[i - 1] ?? -1) + 1;
-    for (let j = 0; j < numPoints;) {
+    for (let j = 0; j < numPoints; ) {
       const [offset, curveSet] = nextCurveSet(start, j, xPoints, yPoints);
       contour.push(...curveSet);
       j = offset;
@@ -289,11 +300,14 @@ export const parseSimpleOutline = (
   }
 
   return outline;
-}
+};
 
 // Compound glyphs are glyphs that combine two glyphs via a set of transformations,
 // e.g. a vs ä, thus making this recursive.
-const parseCompoundOutline = (ttf: TrueType, cursor: Cursor): Glyph["outline"] => {
+const parseCompoundOutline = (
+  ttf: TrueType,
+  cursor: Cursor
+): Glyph["outline"] => {
   enum Transformation {
     // No extra transformation entry.
     None = 0,
@@ -302,11 +316,11 @@ const parseCompoundOutline = (ttf: TrueType, cursor: Cursor): Glyph["outline"] =
     // Scale x and y scale value separately.
     Entry2 = 2,
     // 2 by 2 scale, that is matrix that allows for transformation + translation.
-    Entry3 = 3,
+    Entry3 = 3
   }
 
   interface Flag {
-    // At least one more component follows this one (which is why we don't need a 
+    // At least one more component follows this one (which is why we don't need a
     // `totalContours` here).
     more: boolean;
     // Size of args. Either 1 or 2.
@@ -360,11 +374,12 @@ const parseCompoundOutline = (ttf: TrueType, cursor: Cursor): Glyph["outline"] =
   for (;;) {
     const flag = parseFlag(cursor.nextUint16());
 
-    if (!flag.xy) throw new errors.UnsupportedFormat("TODO: ARGS_ARE_XY_VALUES flag");
+    if (!flag.xy)
+      throw new errors.UnsupportedFormat("TODO: ARGS_ARE_XY_VALUES flag");
 
     // Since this glyph is actually a compound of 2+ glyphs we'll need to grab those.
     const glyphIndex = cursor.nextUint16();
-    const dx = 
+    const dx =
       flag.size === 2
         ? cursor.nextUint16()
         : expect(cursor.nextUint8(), errors.InvalidParsed);
@@ -383,8 +398,8 @@ const parseCompoundOutline = (ttf: TrueType, cursor: Cursor): Glyph["outline"] =
     const glyph = ttf.glyphFromIndex(glyphIndex);
     for (const contour of glyph.outline) {
       // Translate each contour by `dx` and `dy`.
-      const compoundContour: Contour = contour.map(
-        curve => curve.translate(dx, dy)
+      const compoundContour: Contour = contour.map((curve) =>
+        curve.translate(dx, dy)
       );
       outline.push(compoundContour);
     }

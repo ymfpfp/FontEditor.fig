@@ -26,16 +26,17 @@ const engineEndian = littleEndian() ? Endian.little : Endian.big;
 export default class Cursor {
   offset: number;
   buf: Uint8Array;
-  
+
   // Endian of file.
   endian: Endian;
 
   static OverflowError = class extends Error {};
 
-  constructor(into: Uint8Array, endian: Endian, jump: number=0) {
+  constructor(into: Uint8Array, endian: Endian, jump: number = 0) {
     this.buf = into;
     this.offset = jump;
-    if (this.atEnd) throw new Cursor.OverflowError("Jump cannot be > length of buffer");
+    if (this.atEnd)
+      throw new Cursor.OverflowError("Jump cannot be > length of buffer");
     this.endian = endian;
   }
 
@@ -74,7 +75,7 @@ export default class Cursor {
     this.offset = this.length - idx;
     if (this.atEnd) throw new Cursor.OverflowError();
   }
-  
+
   skip(idx: number) {
     this.seek(this.offset + idx);
   }
@@ -94,11 +95,8 @@ export default class Cursor {
   }
 
   nextUint32() {
-    const u32 = [
-      this.nextUint16(),
-      this.nextUint16()
-    ];
-    // JS stores numbers as 32 bits by default. As a result we >>> 0 to force 
+    const u32 = [this.nextUint16(), this.nextUint16()];
+    // JS stores numbers as 32 bits by default. As a result we >>> 0 to force
     // an unsigned interpretation.
     if (this.endian === Endian.little) return ((u32[1] << 16) | u32[0]) >>> 0;
     return ((u32[0] << 16) | u32[1]) >>> 0;
@@ -134,8 +132,9 @@ export default class Cursor {
 
   // And more tricks for floats. We use ArrayBuffer because it looks clean.
   nextFloat() {
-    const bytes =
-      Array.from({length: 4}, () => expect(this.nextUint8(), Cursor.OverflowError));
+    const bytes = Array.from({ length: 4 }, () =>
+      expect(this.nextUint8(), Cursor.OverflowError)
+    );
     let u32 = new Uint8Array(bytes);
     if (this.endian !== engineEndian)
       // If file endian doesn't match `engineEndian`, which is what the ArrayBuffer
@@ -146,8 +145,9 @@ export default class Cursor {
   }
 
   nextDouble() {
-    const bytes = 
-      Array.from({length: 8}, () => expect(this.nextUint8(), Cursor.OverflowError));
+    const bytes = Array.from({ length: 8 }, () =>
+      expect(this.nextUint8(), Cursor.OverflowError)
+    );
     let u64 = new Uint8Array(bytes);
     if (this.endian !== engineEndian) u64 = u64.reverse();
     const f64 = new Float64Array(u64.buffer);
@@ -160,4 +160,3 @@ export default class Cursor {
     return String.fromCharCode(...s.buf);
   }
 }
-

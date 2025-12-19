@@ -1,6 +1,8 @@
 import OpenType from "./otf";
 import TrueType from "./ttf";
 
+export { type CodepointRange } from "./cmap";
+
 export const NOTDEF = 0;
 
 export default {
@@ -16,5 +18,5 @@ export default {
     const font = new OpenType(bytes);
     if (font.isTTF) return new TrueType(bytes);
     return font;
-  },
+  }
 };

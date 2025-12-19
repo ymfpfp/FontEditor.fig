@@ -1,14 +1,14 @@
 // The Apple TrueType manual is a good reference: https://developer.apple.com/fonts/TrueType-Reference-Manual/
 // since OpenType and TrueType share the same file format, different outline tables.
 
-import {CharacterToGlyphIndex, CmapFormat4} from "./cmap";
+import { CharacterToGlyphIndex, CmapFormat4 } from "./cmap";
 import Cursor, * as parse from "./cursor";
 import expect from "./expect";
-import Glyph, {GlyphMetadata} from "./glyph";
+import Glyph, { GlyphMetadata } from "./glyph";
 
 export enum SupportedFormat {
   TrueType,
-  OpenType,
+  OpenType
 }
 
 interface Table {
@@ -22,7 +22,7 @@ export const errors = {
   InvalidParsed: class InvalidParsed extends Error {},
   TableNotFound: class TableNotFound extends Error {},
   UnsupportedFormat: class UnsupportedFormat extends Error {}
-}
+};
 
 export const parseScalarType = (scalar: number): SupportedFormat => {
   switch (scalar) {
@@ -47,14 +47,14 @@ export default class OpenType {
     numGlyphs: number;
 
     unitsPerEm: number;
-   
+
     xMin: number;
     yMin: number;
     xMax: number;
     yMax: number;
   };
 
-  tables: {[k: string]: Table};
+  tables: { [k: string]: Table };
   mapping: CharacterToGlyphIndex;
 
   constructor(bytes: Uint8Array) {
@@ -75,7 +75,7 @@ export default class OpenType {
         checksum: this.cursor.nextUint32(),
         offset: this.cursor.nextUint32(),
         length: this.cursor.nextUint32()
-      }
+      };
     }
 
     // Some tables we need to preprocess ahead of time:
@@ -84,7 +84,7 @@ export default class OpenType {
     this.specificMetadata = {
       ...metadata,
       ...this.parseHead(),
-      ...this.parseMaxp(),
+      ...this.parseMaxp()
     };
 
     this.mapping = this.parseCmap();
@@ -116,7 +116,7 @@ export default class OpenType {
   }
 
   parseHead() {
-    const {cursor} = this.table("head");
+    const { cursor } = this.table("head");
 
     // Skip version, font revision, checksum adjustment.
     cursor.skip(parse.DOUBLE_WORD * 3);
@@ -147,24 +147,24 @@ export default class OpenType {
       xMin,
       yMin,
       xMax,
-      yMax,
+      yMax
     };
   }
 
   parseMaxp() {
-    const {cursor} = this.table("maxp");
+    const { cursor } = this.table("maxp");
     // Skip version.
     cursor.skip(parse.DOUBLE_WORD);
 
     const numGlyphs = cursor.nextUint16();
 
-    return {numGlyphs};
+    return { numGlyphs };
   }
 
   // Parse the cmap table, or character to glyph mapping. Basically, what index
   // of the proper table can this character be found?
   parseCmap(): CharacterToGlyphIndex {
-    const {cursor} = this.table("cmap");
+    const { cursor } = this.table("cmap");
     // Skip version.
     cursor.skip(parse.WORD);
 
@@ -180,7 +180,7 @@ export default class OpenType {
       // Ignoring legacy (1), 3 reliably maps down to Unicode if implemented.
     }
 
-    if (platformId !== 0) 
+    if (platformId !== 0)
       throw new errors.UnsupportedFormat("TODO: Mac and MS encoding platforms");
 
     // platformSpecificId, or Unicode version.
@@ -192,10 +192,12 @@ export default class OpenType {
 
     const format = cursor.nextUint16();
     switch (format) {
-      case 4: 
+      case 4:
         return new CmapFormat4(cursor);
       default:
-        throw new errors.UnsupportedFormat(`TODO: Implement format = ${format}`);
+        throw new errors.UnsupportedFormat(
+          `TODO: Implement format = ${format}`
+        );
     }
   }
 
@@ -205,13 +207,13 @@ export default class OpenType {
       rsb: 0,
 
       tsb: 0,
-      bsb: 0,
+      bsb: 0
     };
 
     // Grab the bearings, skipping them if there is no table for that dimension
     // (i.e., no horizontal bearing for vertical CJK fonts).
     if ("hmtx" in this.tables) {
-      const {cursor} = this.table("hmtx");
+      const { cursor } = this.table("hmtx");
       cursor.skip(parse.DOUBLE_WORD * idx);
       const advanceWidth = cursor.nextUint16();
       bearings.lsb = cursor.nextInt16();
@@ -219,7 +221,7 @@ export default class OpenType {
     }
 
     if ("vmtx" in this.tables) {
-      const {cursor} = this.table("vmtx");
+      const { cursor } = this.table("vmtx");
       cursor.skip(parse.DOUBLE_WORD * idx);
       const advanceHeight = cursor.nextUint16();
       bearings.tsb = cursor.nextInt16();
@@ -230,6 +232,8 @@ export default class OpenType {
   }
 
   // More user facing I suppose.
+
+  // File -> glyph.
 
   glyphFromIndex(idx: number): Glyph {
     throw new errors.UnsupportedFormat("TODO: glyphFromIndex for OTF");
@@ -244,5 +248,11 @@ export default class OpenType {
     for (const idx of this.mapping.glyphIndexes()) {
       yield this.glyphFromIndex(idx);
     }
+  }
+
+  // Glyph -> file.
+
+  encodeGlyph(glyph: Glyph) {
+    // If glyph already exists in `cmap`
   }
 }

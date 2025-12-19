@@ -9,28 +9,24 @@ export type GlyphMetadata = {
     xMax: number;
     yMin: number;
     yMax: number;
-  },
+  };
   bearings: {
     lsb: number;
     rsb: number;
 
     tsb: number;
     bsb: number;
-  }
+  };
 };
 
 export default class Glyph {
   outline: Contour[];
   metadata: GlyphMetadata;
 
-  constructor(
-    outline: Contour[],
-    metadata: GlyphMetadata
-  ) {
+  constructor(outline: Contour[], metadata: GlyphMetadata) {
     this.outline = outline;
     this.metadata = metadata;
   }
 
   // get advance() {}
 }
-

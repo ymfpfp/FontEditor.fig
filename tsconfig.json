@@ -4,10 +4,7 @@
     "lib": ["es6"],
     "moduleResolution": "bundler",
     "strict": true,
-    "typeRoots": [
-      "./node_modules/@types",
-      "./node_modules/@figma"
-    ]
+    "typeRoots": ["./node_modules/@types", "./node_modules/@figma"]
   },
-  "include": ["src/*"]
+  "include": ["src/*", "include/*"]
 }
