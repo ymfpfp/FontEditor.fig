@@ -1,12 +1,14 @@
 // Store version information - important for future backwards compatibility depending
 // on the Unicode version, etc.
 
-type Version = {
+export type Version = {
   ucd: string;
 };
 
-const versions: { [k: string]: Version } = {
+const versions = {
   current: {
     ucd: "17.0.0"
   }
-};
+} satisfies Record<"current" | string, Version>;
+
+export default versions;

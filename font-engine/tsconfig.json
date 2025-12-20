@@ -3,6 +3,7 @@
     "target": "es6",
     "lib": ["es6"],
     "declaration": true,
+    "declarationMap": true,
     "moduleResolution": "bundler",
     "outDir": "dist",
     "strict": true

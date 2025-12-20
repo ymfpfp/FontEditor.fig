@@ -15,6 +15,15 @@ export default class Curve {
     this.curve = curve;
   }
 
+  get asXY() {
+    return this.curve.map((point) => {
+      return {
+        x: point[0],
+        y: point[1]
+      };
+    });
+  }
+
   get curvePoints() {
     return this.curve.slice(0, 2);
   }
@@ -38,7 +47,7 @@ export default class Curve {
       curve[0],
       curve[1],
       controlPoint(curve[0], curve[2]),
-      controlPoint(curve[2], curve[1])
+      controlPoint(curve[1], curve[2])
     ]);
   }
 

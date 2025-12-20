@@ -1,6 +1,7 @@
 // The Apple TrueType manual is a good reference: https://developer.apple.com/fonts/TrueType-Reference-Manual/
 // since OpenType and TrueType share the same file format, different outline tables.
 
+import { Font, FontOptions } from ".";
 import { CharacterToGlyphIndex, CmapFormat4 } from "./cmap";
 import Cursor, * as parse from "./cursor";
 import expect from "./expect";
@@ -38,6 +39,7 @@ export const parseScalarType = (scalar: number): SupportedFormat => {
 
 export default class OpenType {
   cursor: Cursor;
+  options: FontOptions;
 
   // Will be extended by TrueType.
   specificMetadata: {
@@ -57,8 +59,10 @@ export default class OpenType {
   tables: { [k: string]: Table };
   mapping: CharacterToGlyphIndex;
 
-  constructor(bytes: Uint8Array) {
+  constructor(bytes: Uint8Array, options: FontOptions) {
     this.cursor = new Cursor(bytes, parse.Endian.big);
+    this.options = options;
+
     this.tables = {};
     const metadata = {
       type: parseScalarType(this.cursor.nextUint32()),
@@ -234,20 +238,24 @@ export default class OpenType {
   // More user facing I suppose.
 
   // File -> glyph.
-
   glyphFromIndex(idx: number): Glyph {
     throw new errors.UnsupportedFormat("TODO: glyphFromIndex for OTF");
   }
 
-  glyph(codepoint: number): Glyph {
+  glyph(codepoint: number): Glyph | null {
     throw new errors.UnsupportedFormat("TODO: glyph for OTF");
   }
 
   *glyphs() {
     // Stream of all the glyphs in this file.
-    for (const idx of this.mapping.glyphIndexes()) {
-      yield this.glyphFromIndex(idx);
+    for (const [codepoint, idx] of this.mapping.glyphIndexes()) {
+      const glyph = this.glyphFromIndex(idx);
+      yield glyph;
     }
+  }
+
+  *codepoints() {
+    yield* this.mapping.glyphIndexes();
   }
 
   // Glyph -> file.

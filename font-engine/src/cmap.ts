@@ -6,7 +6,8 @@ export interface CharacterToGlyphIndex {
   // We implement this as an interface because each cmap format has different encoding
   // metadata needed for this.
   glyphIndex: (codepoint: number) => number;
-  glyphIndexes: () => Generator<number, void, unknown>;
+  // Generator that returns [character (codepoint), glyph (idx)].
+  glyphIndexes: () => Generator<[number, number], void, unknown>;
 
   // TODO: addGlyph(codepoint: number) for in place representation.
   // This would be perfect but in place representation requires altering the entire
@@ -114,7 +115,7 @@ export class CmapFormat4 implements CharacterToGlyphIndex {
   *glyphIndexes() {
     // Return a generator with the glyph indexes.
     for (const [start, end] of this.codepointRanges) {
-      for (let i = start; i < end; i++) yield i;
+      for (let i = start; i < end; i++) yield [i, i] as [number, number];
     }
   }
 }

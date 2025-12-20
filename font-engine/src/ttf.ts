@@ -2,7 +2,8 @@ import OpenType, { errors } from "./otf";
 import Cursor, * as parse from "./cursor";
 import Glyph, { Contour, GlyphMetadata } from "./glyph";
 import expect from "./expect";
-import Curve, { QuadraticBezier } from "./curve";
+import Curve from "./curve";
+import { FontOptions, NOTDEF } from ".";
 
 export default class TrueType extends OpenType {
   extendedMetadata: {
@@ -10,8 +11,8 @@ export default class TrueType extends OpenType {
   };
   glyphOffsets: number[];
 
-  constructor(bytes: Uint8Array) {
-    super(bytes);
+  constructor(bytes: Uint8Array, options: FontOptions) {
+    super(bytes, options);
 
     // For TTF, we'll also need to parse:
     // * head for a TTF-specific value, whether glyph indexes in loca are u32 or
@@ -64,11 +65,12 @@ export default class TrueType extends OpenType {
 
     if (contours < 0)
       return new Glyph(parseCompoundOutline(this, cursor), metadata);
-    return new Glyph(parseSimpleOutline(cursor, contours), metadata);
+    return new Glyph(parseSimpleOutline(this, cursor, contours), metadata);
   }
 
   glyph(codepoint: number) {
     const idx = this.mapping.glyphIndex(codepoint);
+    if (codepoint !== NOTDEF && idx === NOTDEF) return null;
     return this.glyphFromIndex(idx);
   }
 }
@@ -80,6 +82,7 @@ export default class TrueType extends OpenType {
 // Simple glyphs have a set of contour endpoints, followed by a set of flags,
 // followed by xy points that we can group into curves and then into contours.
 export const parseSimpleOutline = (
+  ttf: TrueType,
   cursor: Cursor,
   totalContours: number
 ): Glyph["outline"] => {
@@ -176,7 +179,7 @@ export const parseSimpleOutline = (
     return { ...flag, coord: delta + coord };
   };
 
-  const parsePoints = (axis: number) => {
+  const parsePoints = (axis: number, f?: (p: number) => number) => {
     const outline = [];
     // Delta, since all the points are relative to the previous.
     let delta = 0;
@@ -186,7 +189,8 @@ export const parseSimpleOutline = (
       const contour = [];
       for (let i = start; i <= endpoint; i++) {
         const point = nextPoint(i, axis, delta);
-        contour.push(point.coord);
+        if (f) contour.push(f(point.coord));
+        else contour.push(point.coord);
         delta = point.coord;
       }
       outline.push(contour);
@@ -201,7 +205,7 @@ export const parseSimpleOutline = (
   // A contour represents a closed loop made by Bezier curves. Right now there are
   // really just individual points in a contour that we need to organize into curves.
   const xContours = parsePoints(0);
-  const yContours = parsePoints(1);
+  const yContours = parsePoints(1, (p) => (ttf.options.yAtTopLeft ? -p : p));
 
   const outline: Glyph["outline"] = [];
 
@@ -245,6 +249,8 @@ export const parseSimpleOutline = (
       controlPoints.push([px, py]);
     } while (flags[start + offset].isControlPoint);
 
+    const finalOnPoint = controlPoints.splice(controlPoints.length - 1, 1)[0];
+
     // Now we'll take our control points and use their midpoint to create the implicit
     // quadratic Beziers.
     const curves: Curve[] = [];
@@ -254,21 +260,21 @@ export const parseSimpleOutline = (
       // back to `prevOnPoint`. e.g. we start with two on-curve points, `p0` in the
       // outer scope and the midpoint between the current control point and the previous
       // one.
-      const p1 = controlPoints[k];
-      const p0 = controlPoints[k - 1];
-      const midpoint = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2] as [
-        number,
-        number
-      ];
-      curves.push(Curve.fromQuadraticBezier([prevOnPoint, midpoint, p0]));
-      prevOnPoint = midpoint;
+      const off = controlPoints[k];
+      const prevOff = controlPoints[k - 1];
+      const onPoint = [
+        (prevOff[0] + off[0]) / 2,
+        (prevOff[1] + off[1]) / 2
+      ] as [number, number];
+      curves.push(Curve.fromQuadraticBezier([prevOnPoint, onPoint, prevOff]));
+      prevOnPoint = onPoint;
     }
 
     // Last but not least, join the last off-point to our first point.
     curves.push(
       Curve.fromQuadraticBezier([
         prevOnPoint,
-        p0,
+        finalOnPoint,
         controlPoints[controlPoints.length - 1]
       ])
     );

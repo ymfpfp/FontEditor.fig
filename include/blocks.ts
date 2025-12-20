@@ -1,7 +1,7 @@
 // TODO: Ideally I'd have a CDN or be able to directly fetch from UCD source,
 // but for now this will do.
 
-export const blocks = {
+export const blocks: { [k: string]: string } = {
   "17.0.0": `# Blocks-17.0.0.txt
 # Date: 2025-08-01
 # © 2025 Unicode®, Inc.
@@ -387,4 +387,13 @@ F0000..FFFFF; Supplementary Private Use Area-A
 # EOF`
 };
 
-export default (block: string) => {};
+export default (block: string): [number, number, string][] => {
+  const ranges: [number, number, string][] = [];
+  for (const line of block.split("\n")) {
+    if (!line.length || line.startsWith("#")) continue;
+    const [range, name] = line.split(";");
+    const [start, end] = range.split("..").map((n) => parseInt(n, 16));
+    ranges.push([start, end, name]);
+  }
+  return ranges;
+};

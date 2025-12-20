@@ -1,7 +1,8 @@
 import fontEngine from "font-engine";
 import { Mutable } from "./types";
 import Glyph from "font-engine/dist/glyph";
-import Page from "./page";
+import Page, { byRange } from "./page";
+import GlyphNode from "./glyph";
 
 figma.showUI(__html__);
 
@@ -16,9 +17,14 @@ figma.ui.onmessage = async (msg: Message) => {
       await upload(msg);
       break;
   }
-
-  figma.closePlugin();
 };
+
+figma.on("currentpagechange", () => {
+  const metadata = figma.currentPage.getPluginDataKeys();
+  if (!("fontEditorMetadata" in metadata)) return;
+
+  const page = Page.from(figma.currentPage);
+});
 
 // TODO: Ideally you start by determining the Unicode ranges and laying them out,
 // loading glyphs only if a page is set.
@@ -26,12 +32,19 @@ figma.ui.onmessage = async (msg: Message) => {
 // loads pages?
 
 const upload = async ({ buf }: UploadMessage) => {
-  const font = fontEngine.font(buf);
+  const font = fontEngine.font(buf, { yAtTopLeft: true });
 
-  const f = await fetch(
-    "https://www.unicode.org/Public/UCD/latest/ucd/Blocks.txt"
-  );
-  console.log(f);
+  // Rename current page to the test page.
+  figma.currentPage.name = "Preview";
+
+  const pages = byRange.create(font);
+
+  const glyph = font.glyph("a".charCodeAt(0))!;
+  const node = new GlyphNode(glyph, 97);
+
+  node.construct();
+
+  node.render(0, 0).then((outline) => {});
 
   // const font = fontEngine.font(msg.buf);
   // const test = font.glyph("a".charCodeAt(0));
